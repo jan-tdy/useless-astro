@@ -1,0 +1,92 @@
+---
+import Layout from '../../layouts/Layout.astro';
+const base = import.meta.env.BASE_URL;
+---
+<Layout title="Astronomical Distance Converter">
+  <p class="breadcrumb"><a href={base}>Tools</a> / Astronomical Distance Converter</p>
+  <div class="page-header">
+    <h1>Astronomical Distance Converter</h1>
+    <p>Convert between kilometres, astronomical units, light-time, light-years and parsecs.</p>
+  </div>
+
+  <div class="panel">
+    <div class="field-row">
+      <div class="field">
+        <label for="dist-value">Value</label>
+        <input type="number" id="dist-value" value="1" step="any" />
+      </div>
+      <div class="field">
+        <label for="dist-unit">Unit</label>
+        <select id="dist-unit">
+          <option value="km">Kilometres</option>
+          <option value="au" selected>Astronomical units (AU)</option>
+          <option value="ls">Light-seconds</option>
+          <option value="lm">Light-minutes</option>
+          <option value="ly">Light-years</option>
+          <option value="pc">Parsecs</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="result" id="dist-results"></div>
+  </div>
+
+  <p class="note">Uses IAU-adopted constants: 1 AU = 149,597,870.7 km; 1 pc = 3.26156 ly; c = 299,792.458 km/s.</p>
+</Layout>
+
+<script>
+  const KM_PER_AU = 149597870.7;
+  const KM_PER_LS = 299792.458;
+  const C_KM_S = 299792.458;
+  const SECONDS_PER_YEAR = 365.25 * 86400;
+  const KM_PER_LY = C_KM_S * SECONDS_PER_YEAR;
+  const KM_PER_PC = KM_PER_LY * 3.26156378;
+
+  const units = {
+    km: { label: 'Kilometres', toKm: (v) => v },
+    au: { label: 'Astronomical units', toKm: (v) => v * KM_PER_AU },
+    ls: { label: 'Light-seconds', toKm: (v) => v * KM_PER_LS },
+    lm: { label: 'Light-minutes', toKm: (v) => v * KM_PER_LS * 60 },
+    ly: { label: 'Light-years', toKm: (v) => v * KM_PER_LY },
+    pc: { label: 'Parsecs', toKm: (v) => v * KM_PER_PC },
+  };
+
+  const fromKm = {
+    km: (km) => km,
+    au: (km) => km / KM_PER_AU,
+    ls: (km) => km / KM_PER_LS,
+    lm: (km) => km / (KM_PER_LS * 60),
+    ly: (km) => km / KM_PER_LY,
+    pc: (km) => km / KM_PER_PC,
+  };
+
+  const valueInput = document.getElementById('dist-value');
+  const unitSelect = document.getElementById('dist-unit');
+  const results = document.getElementById('dist-results');
+
+  function formatNumber(n) {
+    if (!Number.isFinite(n)) return '—';
+    const abs = Math.abs(n);
+    if (abs !== 0 && (abs < 0.0001 || abs >= 1e9)) return n.toExponential(4);
+    return n.toLocaleString('en-US', { maximumFractionDigits: 6 });
+  }
+
+  function update() {
+    const value = Number(valueInput.value);
+    if (Number.isNaN(value)) return;
+    const unit = unitSelect.value;
+    const km = units[unit].toKm(value);
+
+    results.innerHTML = Object.entries(units)
+      .filter(([key]) => key !== unit)
+      .map(([key, def]) => {
+        const converted = fromKm[key](km);
+        return `<div class="result-row"><span class="k">${def.label}</span><span class="v">${formatNumber(converted)}</span></div>`;
+      })
+      .join('');
+  }
+
+  valueInput.addEventListener('input', update);
+  unitSelect.addEventListener('change', update);
+  update();
+</script>

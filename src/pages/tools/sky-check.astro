@@ -1,0 +1,160 @@
+---
+import Layout from '../../layouts/Layout.astro';
+const base = import.meta.env.BASE_URL;
+---
+<Layout title="Clear Sky Checker">
+  <p class="breadcrumb"><a href={base}>Tools</a> / Clear Sky Checker</p>
+  <div class="page-header">
+    <h1>Clear Sky Checker</h1>
+    <p>
+      A quick cloud-cover forecast for the next two nights, from the free
+      <a href="https://open-meteo.com/">Open-Meteo</a> API. No API key, no account — this
+      is not a replacement for a proper planning tool, just a fast sanity check.
+    </p>
+  </div>
+
+  <div class="panel">
+    <div class="field">
+      <label for="place">Location</label>
+      <div class="field-row">
+        <input type="text" id="place" placeholder="e.g. Córdoba, Spain" style="flex:2;" />
+        <button id="search-btn" type="button">Search</button>
+      </div>
+      <p class="hint">Or enter coordinates directly below.</p>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label for="lat">Latitude</label>
+        <input type="number" id="lat" step="any" placeholder="37.88" />
+      </div>
+      <div class="field">
+        <label for="lon">Longitude</label>
+        <input type="number" id="lon" step="any" placeholder="-4.78" />
+      </div>
+      <div class="field" style="flex:0;align-self:end;">
+        <button id="fetch-btn" type="button">Get forecast</button>
+      </div>
+    </div>
+
+    <div id="matches"></div>
+    <p class="error-text" id="error" style="display:none;"></p>
+    <div id="forecast"></div>
+  </div>
+
+  <p class="note">
+    Cloud cover is shown in three layers when available (low/mid/high aren't broken out
+    here — this uses total cloud cover only). Always cross-check with a dedicated
+    astronomy forecast before driving out to a dark site.
+  </p>
+</Layout>
+
+<script>
+  const place = document.getElementById('place');
+  const searchBtn = document.getElementById('search-btn');
+  const lat = document.getElementById('lat');
+  const lon = document.getElementById('lon');
+  const fetchBtn = document.getElementById('fetch-btn');
+  const matchesEl = document.getElementById('matches');
+  const errorEl = document.getElementById('error');
+  const forecastEl = document.getElementById('forecast');
+
+  function showError(msg) {
+    errorEl.textContent = msg;
+    errorEl.style.display = msg ? 'block' : 'none';
+  }
+
+  async function search() {
+    const query = place.value.trim();
+    if (!query) return;
+    showError('');
+    matchesEl.innerHTML = '<p class="hint">Searching…</p>';
+    try {
+      const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}&count=5&language=en`;
+      const res = await fetch(url);
+      const data = await res.json();
+      const results = data.results || [];
+      if (results.length === 0) {
+        matchesEl.innerHTML = '';
+        showError('No matching locations found.');
+        return;
+      }
+      matchesEl.innerHTML = results
+        .map(
+          (r, i) =>
+            `<button type="button" class="secondary" data-i="${i}" style="margin:0.25rem 0.5rem 0.25rem 0;">${r.name}${r.admin1 ? ', ' + r.admin1 : ''}, ${r.country}</button>`
+        )
+        .join('');
+      matchesEl.querySelectorAll('button').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const r = results[Number(btn.dataset.i)];
+          lat.value = r.latitude;
+          lon.value = r.longitude;
+          loadForecast();
+        });
+      });
+    } catch (e) {
+      showError('Could not reach the geocoding service.');
+    }
+  }
+
+  function cloudLabel(pct) {
+    if (pct < 20) return 'Clear';
+    if (pct < 50) return 'Partly cloudy';
+    if (pct < 80) return 'Mostly cloudy';
+    return 'Overcast';
+  }
+
+  async function loadForecast() {
+    const latV = Number(lat.value);
+    const lonV = Number(lon.value);
+    if (Number.isNaN(latV) || Number.isNaN(lonV)) {
+      showError('Enter a location or valid coordinates first.');
+      return;
+    }
+    showError('');
+    forecastEl.innerHTML = '<p class="hint">Loading forecast…</p>';
+    try {
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${latV}&longitude=${lonV}&hourly=cloudcover&forecast_days=2&timezone=auto`;
+      const res = await fetch(url);
+      const data = await res.json();
+      const times = data.hourly.time;
+      const clouds = data.hourly.cloudcover;
+      const now = new Date();
+      const rows = times
+        .map((t, i) => ({ t: new Date(t), c: clouds[i] }))
+        .filter((r) => r.t >= now)
+        .slice(0, 24);
+
+      const tz = data.timezone || '';
+      forecastEl.innerHTML = `
+        <p class="hint">Timezone: ${tz}</p>
+        <table>
+          <thead><tr><th>Local time</th><th>Cloud cover</th><th>Conditions</th></tr></thead>
+          <tbody>
+            ${rows
+              .map(
+                (r) => `<tr>
+                  <td>${r.t.toLocaleString(undefined, { weekday: 'short', hour: '2-digit', minute: '2-digit' })}</td>
+                  <td>${r.c}%</td>
+                  <td>${cloudLabel(r.c)}</td>
+                </tr>`
+              )
+              .join('')}
+          </tbody>
+        </table>
+      `;
+    } catch (e) {
+      forecastEl.innerHTML = '';
+      showError('Could not reach the forecast service.');
+    }
+  }
+
+  searchBtn.addEventListener('click', search);
+  place.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      search();
+    }
+  });
+  fetchBtn.addEventListener('click', loadForecast);
+</script>

@@ -1,0 +1,65 @@
+---
+import Layout from '../../layouts/Layout.astro';
+const base = import.meta.env.BASE_URL;
+---
+<Layout title="Cloudy Night Excuse Generator">
+  <p class="breadcrumb"><a href={base}>Tools</a> / Cloudy Night Excuse Generator</p>
+  <div class="page-header">
+    <span class="eyebrow">100% useless</span>
+    <h1>Cloudy Night Excuse Generator</h1>
+    <p>For the log entry you write instead of the one you wanted to write.</p>
+  </div>
+
+  <div class="panel">
+    <button type="button" id="gen-btn">Generate excuse</button>
+    <div class="output-box" id="excuse-output">Click the button. The sky already knows what it did.</div>
+  </div>
+</Layout>
+
+<script>
+  const subjects = [
+    'A rogue cirrus layer',
+    'The neighbour\'s new security floodlight',
+    'An unforecast temperature inversion',
+    'Saharan dust nobody mentioned',
+    'A satellite train, several of them, all at once',
+    'The seeing',
+    'A sudden and deeply personal dew problem',
+    'The one cloud in the entire county',
+    'Jupiter, out of spite',
+    'The mount\'s firmware',
+    'A passing weather balloon',
+    'Airglow, apparently',
+  ];
+  const actions = [
+    'parked itself directly over the target',
+    'ruined the transparency for exactly forty minutes',
+    'triggered the guider into a full existential crisis',
+    'fogged the corrector plate on principle',
+    'arrived the moment the exposure started',
+    'convinced the ASCOM driver to disconnect',
+    'made the limiting magnitude embarrassing',
+    'turned a 3-hour session into a 12-minute one',
+    'was somehow visible only through the eyepiece, never the forecast',
+    'gave the FWHM a personality disorder',
+  ];
+  const closers = [
+    'Session logged as a partial loss.',
+    'Recommend blaming Mercury retrograde in the notes.',
+    'No usable data; morale also affected.',
+    'Filed under "clear skies, allegedly".',
+    'The forecast app has been quietly muted.',
+    'This has been reported to nobody, because nobody would believe it.',
+  ];
+
+  function pick(arr) {
+    return arr[Math.floor(Math.random() * arr.length)];
+  }
+
+  const btn = document.getElementById('gen-btn');
+  const out = document.getElementById('excuse-output');
+
+  btn.addEventListener('click', () => {
+    out.textContent = `${pick(subjects)} ${pick(actions)}. ${pick(closers)}`;
+  });
+</script>

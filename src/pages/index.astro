@@ -1,0 +1,89 @@
+---
+import Layout from '../layouts/Layout.astro';
+const base = import.meta.env.BASE_URL;
+
+const tools = [
+  {
+    href: `${base}/tools/coordinates`,
+    title: 'RA/Dec Converter',
+    desc: 'Convert equatorial coordinates between HMS/DMS and decimal degrees.',
+  },
+  {
+    href: `${base}/tools/magnitude`,
+    title: 'Magnitude ↔ Flux Ratio',
+    desc: 'Convert a magnitude difference to a brightness ratio, or back.',
+  },
+  {
+    href: `${base}/tools/fov`,
+    title: 'Telescope FOV & Magnification',
+    desc: 'Eyepiece magnification, true field of view, and exit pupil from your gear.',
+  },
+  {
+    href: `${base}/tools/distances`,
+    title: 'Astronomical Distance Converter',
+    desc: 'km, AU, light-minutes, light-years and parsecs, converted both ways.',
+  },
+  {
+    href: `${base}/tools/sky-check`,
+    title: 'Clear Sky Checker',
+    desc: 'Cloud cover for the next 48 hours at any location, no account needed.',
+  },
+  {
+    href: `${base}/tools/catalog-import`,
+    title: 'Catalog Converter for JapyScope',
+    desc: 'Turn a 3-column, AAVSO-style, or any other delimited target list into a japyscope-remote import CSV.',
+  },
+];
+
+const fun = [
+  {
+    href: `${base}/fun/excuse-generator`,
+    title: 'Cloudy Night Excuse Generator',
+    desc: 'A fresh, technically-plausible reason your session got rained out.',
+  },
+  {
+    href: `${base}/fun/star-namer`,
+    title: 'Star & Exoplanet Namer',
+    desc: 'Generates a suitably pompous catalogue-style name for anything you point at.',
+  },
+  {
+    href: `${base}/fun/horoscope`,
+    title: 'Telescope Horoscope',
+    desc: "Today's completely unscientific forecast for your telescope.",
+  },
+];
+---
+<Layout>
+  <div class="page-header">
+    <span class="eyebrow">visual-astro's little sibling</span>
+    <h1>Useless Astro</h1>
+    <p>
+      A no-login, static toolbox of small astronomy converters, plus a few things that
+      exist purely because they're funny. For actual observation logging, session
+      tracking and AAVSO/VSNET exports, see
+      <a href="https://github.com/jan-tdy/visual-astro">Visual Astro</a>.
+    </p>
+  </div>
+
+  <h2 class="section-title" id="tools">Tools</h2>
+  <div class="card-grid">
+    {tools.map((t) => (
+      <a class="card" href={t.href}>
+        <h3>{t.title}</h3>
+        <p>{t.desc}</p>
+        <span class="tag">Open</span>
+      </a>
+    ))}
+  </div>
+
+  <h2 class="section-title" id="fun">Fun & useless</h2>
+  <div class="card-grid">
+    {fun.map((t) => (
+      <a class="card" href={t.href}>
+        <h3>{t.title}</h3>
+        <p>{t.desc}</p>
+        <span class="tag">Open</span>
+      </a>
+    ))}
+  </div>
+</Layout>
