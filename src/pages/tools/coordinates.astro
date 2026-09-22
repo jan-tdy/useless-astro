@@ -1,0 +1,156 @@
+---
+import Layout from '../../layouts/Layout.astro';
+const base = import.meta.env.BASE_URL;
+---
+<Layout title="RA/Dec Converter">
+  <p class="breadcrumb"><a href={base}>Tools</a> / RA/Dec Converter</p>
+  <div class="page-header">
+    <h1>RA/Dec Converter</h1>
+    <p>
+      Convert right ascension and declination between sexagesimal (HMS/DMS) and
+      decimal degrees. Both fields in each row stay in sync as you type.
+    </p>
+  </div>
+
+  <div class="panel">
+    <h3 style="margin-top:0;">Right Ascension</h3>
+    <div class="field-row">
+      <div class="field">
+        <label for="ra-h">Hours</label>
+        <input type="number" id="ra-h" value="12" step="1" />
+      </div>
+      <div class="field">
+        <label for="ra-m">Minutes</label>
+        <input type="number" id="ra-m" value="0" step="1" min="0" max="59" />
+      </div>
+      <div class="field">
+        <label for="ra-s">Seconds</label>
+        <input type="number" id="ra-s" value="0" step="0.01" min="0" max="59.999" />
+      </div>
+      <div class="field">
+        <label for="ra-deg">Decimal degrees</label>
+        <input type="text" id="ra-deg" value="180" />
+      </div>
+    </div>
+    <p class="hint">RA in decimal hours: <span id="ra-hours-out">12.000000</span> h</p>
+  </div>
+
+  <div class="panel" style="margin-top:1.25rem;">
+    <h3 style="margin-top:0;">Declination</h3>
+    <div class="field-row">
+      <div class="field">
+        <label for="dec-sign">Sign</label>
+        <select id="dec-sign">
+          <option value="1">+</option>
+          <option value="-1">-</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="dec-d">Degrees</label>
+        <input type="number" id="dec-d" value="0" step="1" min="0" max="90" />
+      </div>
+      <div class="field">
+        <label for="dec-m">Arcminutes</label>
+        <input type="number" id="dec-m" value="0" step="1" min="0" max="59" />
+      </div>
+      <div class="field">
+        <label for="dec-s">Arcseconds</label>
+        <input type="number" id="dec-s" value="0" step="0.01" min="0" max="59.999" />
+      </div>
+      <div class="field">
+        <label for="dec-deg">Decimal degrees</label>
+        <input type="text" id="dec-deg" value="0" />
+      </div>
+    </div>
+  </div>
+
+  <p class="note">
+    Runs entirely in your browser — nothing is sent anywhere. Negative RA hours wrap into
+    the previous day's range; declination is clamped to ±90°.
+  </p>
+</Layout>
+
+<script>
+  function clamp(v, min, max) {
+    return Math.min(max, Math.max(min, v));
+  }
+
+  // --- RA ---
+  const raH = document.getElementById('ra-h');
+  const raM = document.getElementById('ra-m');
+  const raS = document.getElementById('ra-s');
+  const raDeg = document.getElementById('ra-deg');
+  const raHoursOut = document.getElementById('ra-hours-out');
+
+  function raFromHMS() {
+    const h = Number(raH.value) || 0;
+    const m = Number(raM.value) || 0;
+    const s = Number(raS.value) || 0;
+    const sign = h < 0 ? -1 : 1;
+    let hours = sign * (Math.abs(h) + m / 60 + s / 3600);
+    hours = ((hours % 24) + 24) % 24;
+    return hours;
+  }
+
+  function updateRaFromHMS() {
+    const hours = raFromHMS();
+    raDeg.value = (hours * 15).toFixed(6);
+    raHoursOut.textContent = hours.toFixed(6);
+  }
+
+  function updateRaFromDeg() {
+    let deg = Number(raDeg.value);
+    if (Number.isNaN(deg)) return;
+    deg = ((deg % 360) + 360) % 360;
+    const hours = deg / 15;
+    const h = Math.floor(hours);
+    const mFull = (hours - h) * 60;
+    const m = Math.floor(mFull);
+    const s = (mFull - m) * 60;
+    raH.value = h;
+    raM.value = m;
+    raS.value = s.toFixed(2);
+    raHoursOut.textContent = hours.toFixed(6);
+  }
+
+  [raH, raM, raS].forEach((el) => el.addEventListener('input', updateRaFromHMS));
+  raDeg.addEventListener('input', updateRaFromDeg);
+  updateRaFromHMS();
+
+  // --- Dec ---
+  const decSign = document.getElementById('dec-sign');
+  const decD = document.getElementById('dec-d');
+  const decM = document.getElementById('dec-m');
+  const decS = document.getElementById('dec-s');
+  const decDeg = document.getElementById('dec-deg');
+
+  function updateDecFromDMS() {
+    const sign = Number(decSign.value);
+    const d = clamp(Number(decD.value) || 0, 0, 90);
+    const m = Number(decM.value) || 0;
+    const s = Number(decS.value) || 0;
+    let deg = sign * (d + m / 60 + s / 3600);
+    deg = clamp(deg, -90, 90);
+    decDeg.value = deg.toFixed(6);
+  }
+
+  function updateDecFromDeg() {
+    let deg = Number(decDeg.value);
+    if (Number.isNaN(deg)) return;
+    deg = clamp(deg, -90, 90);
+    const sign = deg < 0 ? -1 : 1;
+    const abs = Math.abs(deg);
+    const d = Math.floor(abs);
+    const mFull = (abs - d) * 60;
+    const m = Math.floor(mFull);
+    const s = (mFull - m) * 60;
+    decSign.value = String(sign);
+    decD.value = d;
+    decM.value = m;
+    decS.value = s.toFixed(2);
+  }
+
+  [decSign, decD, decM, decS].forEach((el) => el.addEventListener('input', updateDecFromDMS));
+  decDeg.addEventListener('input', updateDecFromDeg);
+  updateDecFromDMS();
+</script>

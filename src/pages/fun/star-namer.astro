@@ -1,0 +1,58 @@
+---
+import Layout from '../../layouts/Layout.astro';
+const base = import.meta.env.BASE_URL;
+---
+<Layout title="Star & Exoplanet Namer">
+  <p class="breadcrumb"><a href={base}>Tools</a> / Star & Exoplanet Namer</p>
+  <div class="page-header">
+    <span class="eyebrow">100% useless, 0% official</span>
+    <h1>Star & Exoplanet Namer</h1>
+    <p>
+      Generates a suitably self-important catalogue designation for whatever you were
+      just looking at. Not recognised by the IAU. Not recognised by anyone.
+    </p>
+  </div>
+
+  <div class="panel">
+    <div class="field">
+      <label for="thing-input">What did you point the telescope at? (optional)</label>
+      <input type="text" id="thing-input" placeholder="e.g. that smudge near Cygnus" />
+    </div>
+    <button type="button" id="gen-btn">Name it</button>
+    <div class="output-box" id="name-output">Your designation will appear here.</div>
+  </div>
+</Layout>
+
+<script>
+  const prefixes = ['JS', 'HD', 'NGC', 'PSR', 'WD', 'USL', 'KOI', 'TIC', 'OGLE', 'GJ'];
+  const greek = ['Alpha', 'Beta', 'Gamma', 'Delta', 'Epsilon', 'Zeta', 'Theta', 'Omega'];
+  const suffixes = ['b', 'c', 'Prime', 'Minor', 'A', 'B', 'Redux'];
+  const epithets = [
+    'the Unremarkable',
+    'That Definitely Wasn\'t a Plane',
+    'Probably a Satellite',
+    'the Slightly Fuzzy',
+    'of Uncertain Magnitude',
+    'the Overexposed',
+    'Last Seen Tuesday',
+    'the Suspiciously Round',
+  ];
+
+  function pick(arr) {
+    return arr[Math.floor(Math.random() * arr.length)];
+  }
+
+  function randInt(min, max) {
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+  }
+
+  const input = document.getElementById('thing-input');
+  const btn = document.getElementById('gen-btn');
+  const out = document.getElementById('name-output');
+
+  btn.addEventListener('click', () => {
+    const catalogue = `${pick(prefixes)}-${randInt(1000, 99999)}${pick(suffixes)}`;
+    const common = `${pick(greek)} ${input.value.trim() || pick(['Cygni', 'Draconis', 'Lyrae', 'Andromedae', 'Orionis'])} ${pick(epithets)}`;
+    out.innerHTML = `<strong>${catalogue}</strong><br />informally: ${common}`;
+  });
+</script>

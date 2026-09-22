@@ -1,0 +1,427 @@
+---
+import Layout from '../../layouts/Layout.astro';
+const base = import.meta.env.BASE_URL;
+---
+<Layout title="Catalog Converter for JapyScope">
+  <p class="breadcrumb"><a href={base}>Tools</a> / Catalog Converter for JapyScope</p>
+  <div class="page-header">
+    <h1>Catalog Converter for JapyScope</h1>
+    <p>
+      Paste a target list in whatever format you have it — a 3-column
+      name/RA/Dec list, an AAVSO-style export, anything delimited — map the
+      columns once, and get back a CSV ready to import into
+      <a href="https://github.com/jan-tdy/japyscope-remote">japyscope-remote</a>'s
+      catalog importer (<code>name,ra,dec,type,note</code>, RA as
+      <code>HH:MM:SS</code>, Dec as <code>±DD:MM:SS</code>).
+    </p>
+  </div>
+
+  <div class="panel">
+    <div class="field">
+      <label for="raw-input">Paste your data</label>
+      <textarea id="raw-input" rows="8" style="width:100%;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);font-family:var(--font-mono);font-size:0.85rem;padding:0.6rem;"></textarea>
+      <p class="hint">
+        One object per line. Header row is optional and auto-detected. Works with commas,
+        tabs, semicolons or plain whitespace.
+      </p>
+    </div>
+
+    <div class="field-row">
+      <div class="field">
+        <label for="delimiter">Delimiter</label>
+        <select id="delimiter">
+          <option value="auto">Auto-detect</option>
+          <option value="comma">Comma</option>
+          <option value="tab">Tab</option>
+          <option value="semicolon">Semicolon</option>
+          <option value="ws">Whitespace</option>
+        </select>
+      </div>
+      <div class="field" style="display:flex;align-items:end;gap:0.4rem;">
+        <label style="display:flex;align-items:center;gap:0.4rem;font-weight:400;">
+          <input type="checkbox" id="has-header" checked style="width:auto;" />
+          First row is a header
+        </label>
+      </div>
+      <div class="field" style="display:flex;align-items:end;">
+        <button type="button" id="load-sample" class="secondary">Load sample (3-column)</button>
+      </div>
+    </div>
+
+    <button type="button" id="parse-btn">Parse columns</button>
+
+    <div id="mapping-area" style="margin-top:1.5rem;"></div>
+
+    <div id="warnings"></div>
+
+    <div id="preview-area"></div>
+
+    <div id="output-area" style="display:none;">
+      <h3>Output CSV</h3>
+      <textarea id="output-csv" rows="8" readonly style="width:100%;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);font-family:var(--font-mono);font-size:0.82rem;padding:0.6rem;"></textarea>
+      <div class="field-row" style="margin-top:0.75rem;">
+        <button type="button" id="download-btn">Download CSV</button>
+        <button type="button" id="copy-btn" class="secondary">Copy to clipboard</button>
+      </div>
+    </div>
+  </div>
+
+  <p class="note">
+    Everything happens in your browser — nothing is uploaded anywhere. RA/Dec are
+    normalized to sexagesimal (<code>HH:MM:SS</code> / <code>±DD:MM:SS</code>) to match
+    japyscope-remote's own import template; decimal-degree or decimal-hour sources (common
+    in AAVSO VSX exports) are converted automatically once you pick the right format per
+    column.
+  </p>
+</Layout>
+
+<script>
+  const rawInput = document.getElementById('raw-input');
+  const delimiterSel = document.getElementById('delimiter');
+  const hasHeaderChk = document.getElementById('has-header');
+  const parseBtn = document.getElementById('parse-btn');
+  const loadSampleBtn = document.getElementById('load-sample');
+  const mappingArea = document.getElementById('mapping-area');
+  const warningsEl = document.getElementById('warnings');
+  const previewArea = document.getElementById('preview-area');
+  const outputArea = document.getElementById('output-area');
+  const outputCsv = document.getElementById('output-csv');
+  const downloadBtn = document.getElementById('download-btn');
+  const copyBtn = document.getElementById('copy-btn');
+
+  const SAMPLE = `name,ra,dec
+M31,00:42:44,+41:16:09
+M42,05:35:17,-05:23:28
+T CrB,15:59:30,+25:55:13`;
+
+  loadSampleBtn.addEventListener('click', () => {
+    rawInput.value = SAMPLE;
+    delimiterSel.value = 'comma';
+    hasHeaderChk.checked = true;
+  });
+
+  function parseCsvLine(line) {
+    const out = [];
+    let cur = '';
+    let inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (inQuotes) {
+        if (ch === '"') {
+          if (line[i + 1] === '"') {
+            cur += '"';
+            i++;
+          } else {
+            inQuotes = false;
+          }
+        } else {
+          cur += ch;
+        }
+      } else if (ch === '"') {
+        inQuotes = true;
+      } else if (ch === ',') {
+        out.push(cur);
+        cur = '';
+      } else {
+        cur += ch;
+      }
+    }
+    out.push(cur);
+    return out.map((s) => s.trim());
+  }
+
+  function splitLine(line, delim) {
+    if (delim === 'comma') return parseCsvLine(line);
+    if (delim === 'tab') return line.split('\t').map((s) => s.trim());
+    if (delim === 'semicolon') return line.split(';').map((s) => s.trim());
+    return line.trim().split(/\s+/);
+  }
+
+  function detectDelimiter(lines) {
+    if (lines.some((l) => l.includes('\t'))) return 'tab';
+    if (lines.some((l) => l.includes(','))) return 'comma';
+    if (lines.some((l) => l.includes(';'))) return 'semicolon';
+    return 'ws';
+  }
+
+  function parseSexagesimal(str) {
+    if (!str) return null;
+    let s = String(str).trim();
+    let sign = 1;
+    if (s.startsWith('-')) {
+      sign = -1;
+      s = s.slice(1);
+    } else if (s.startsWith('+')) {
+      s = s.slice(1);
+    }
+    s = s.replace(/[hHmM°'′]/g, ' ').replace(/[sS"″]/g, '');
+    const parts = s.trim().split(/[:\s]+/).filter(Boolean);
+    if (parts.length === 0) return null;
+    const d = Number(parts[0]);
+    if (Number.isNaN(d)) return null;
+    const m = parts[1] !== undefined ? Number(parts[1]) : 0;
+    const sec = parts[2] !== undefined ? Number(parts[2]) : 0;
+    if (Number.isNaN(m) || Number.isNaN(sec)) return null;
+    return sign * (Math.abs(d) + m / 60 + sec / 3600);
+  }
+
+  function parseRa(raw, format) {
+    if (format === 'sex') return parseSexagesimal(raw);
+    const v = Number(raw);
+    if (Number.isNaN(v)) return null;
+    return format === 'deg' ? v / 15 : v;
+  }
+
+  function parseDec(raw, format) {
+    if (format === 'sex') return parseSexagesimal(raw);
+    const v = Number(raw);
+    return Number.isNaN(v) ? null : v;
+  }
+
+  function pad(n, width) {
+    return String(Math.floor(n)).padStart(width, '0');
+  }
+
+  function formatRaHMS(hoursDecimal) {
+    let hours = ((hoursDecimal % 24) + 24) % 24;
+    const h = Math.floor(hours);
+    const mFull = (hours - h) * 60;
+    const m = Math.floor(mFull);
+    let s = Math.round((mFull - m) * 60);
+    let hh = h, mm = m;
+    if (s === 60) { s = 0; mm += 1; }
+    if (mm === 60) { mm = 0; hh = (hh + 1) % 24; }
+    return `${pad(hh, 2)}:${pad(mm, 2)}:${pad(s, 2)}`;
+  }
+
+  function formatDecDMS(degDecimal) {
+    let deg = Math.min(90, Math.max(-90, degDecimal));
+    const sign = deg < 0 ? '-' : '+';
+    const abs = Math.abs(deg);
+    const d = Math.floor(abs);
+    const mFull = (abs - d) * 60;
+    const m = Math.floor(mFull);
+    let s = Math.round((mFull - m) * 60);
+    let dd = d, mm = m;
+    if (s === 60) { s = 0; mm += 1; }
+    if (mm === 60) { mm = 0; dd += 1; }
+    return `${sign}${pad(dd, 2)}:${pad(mm, 2)}:${pad(s, 2)}`;
+  }
+
+  function csvField(value) {
+    const v = value == null ? '' : String(value);
+    if (/[",\n]/.test(v)) return `"${v.replace(/"/g, '""')}"`;
+    return v;
+  }
+
+  let state = { rows: [], hasHeader: true, header: [] };
+
+  function guessRole(headerText, colIndex, colCount) {
+    const h = (headerText || '').toLowerCase();
+    if (/name|designation|star|object|id/.test(h)) return 'name';
+    if (/^ra$|right\s*asc/.test(h)) return 'ra';
+    if (/^dec|declin/.test(h)) return 'dec';
+    if (/type|class/.test(h)) return 'type';
+    if (/note|comment|remark/.test(h)) return 'note';
+    if (!headerText) {
+      if (colCount >= 5) return ['name', 'ra', 'dec', 'type', 'note'][colIndex] || 'ignore';
+      if (colCount === 3) return ['name', 'ra', 'dec'][colIndex] || 'ignore';
+    }
+    return 'ignore';
+  }
+
+  function guessCoordFormat(sampleValue) {
+    if (!sampleValue) return 'sex';
+    return /[:hms\s]/i.test(sampleValue.trim()) && /\d\s*[:hms\s]\s*\d/i.test(sampleValue.trim()) ? 'sex' : 'deg';
+  }
+
+  function doParse() {
+    const raw = rawInput.value;
+    const lines = raw.split(/\r\n|\r|\n/).filter((l) => l.trim().length > 0);
+    if (lines.length === 0) {
+      mappingArea.innerHTML = '<p class="error-text">Paste some data first.</p>';
+      previewArea.innerHTML = '';
+      outputArea.style.display = 'none';
+      return;
+    }
+    const delim = delimiterSel.value === 'auto' ? detectDelimiter(lines) : delimiterSel.value;
+    const rows = lines.map((l) => splitLine(l, delim));
+    const colCount = Math.max(...rows.map((r) => r.length));
+    const hasHeader = hasHeaderChk.checked;
+    const header = hasHeader ? rows[0] : [];
+    const dataRows = hasHeader ? rows.slice(1) : rows;
+
+    state = { rows: dataRows, hasHeader, header, colCount };
+
+    const sampleRow = dataRows[0] || [];
+    let mappingHtml = '<div class="field-row" style="flex-wrap:wrap;">';
+    for (let i = 0; i < colCount; i++) {
+      const headerText = header[i] || '';
+      const role = guessRole(headerText, i, colCount);
+      const sample = sampleRow[i] || '';
+      const coordFormat = guessCoordFormat(sample);
+      mappingHtml += `
+        <div class="field" style="min-width:170px;border:1px solid var(--border);border-radius:var(--radius);padding:0.6rem;">
+          <label>${headerText ? `"${headerText}"` : `Column ${i + 1}`}</label>
+          <p class="hint" style="margin:0 0 0.4rem;">e.g. ${sample || '—'}</p>
+          <select data-col="${i}" class="role-select">
+            <option value="ignore" ${role === 'ignore' ? 'selected' : ''}>Ignore</option>
+            <option value="name" ${role === 'name' ? 'selected' : ''}>Name</option>
+            <option value="ra" ${role === 'ra' ? 'selected' : ''}>RA</option>
+            <option value="dec" ${role === 'dec' ? 'selected' : ''}>Dec</option>
+            <option value="type" ${role === 'type' ? 'selected' : ''}>Type</option>
+            <option value="note" ${role === 'note' ? 'selected' : ''}>Note</option>
+          </select>
+          <div class="coord-format" data-col="${i}" style="margin-top:0.4rem;display:${role === 'ra' || role === 'dec' ? 'block' : 'none'};">
+            <select data-col-format="${i}" class="format-select"></select>
+          </div>
+        </div>`;
+    }
+    mappingHtml += '</div>';
+    mappingHtml += `
+      <div class="field" style="margin-top:1rem;">
+        <label style="display:flex;align-items:center;gap:0.4rem;font-weight:400;">
+          <input type="checkbox" id="append-ignored" style="width:auto;" />
+          Append ignored columns to Note
+        </label>
+      </div>
+      <button type="button" id="convert-btn" style="margin-top:0.5rem;">Convert</button>
+    `;
+    mappingArea.innerHTML = mappingHtml;
+
+    mappingArea.querySelectorAll('.role-select').forEach((sel) => {
+      const col = sel.dataset.col;
+      const formatWrap = mappingArea.querySelector(`.coord-format[data-col="${col}"]`);
+      const formatSelect = formatWrap.querySelector('.format-select');
+      function refreshFormatOptions() {
+        const role = sel.value;
+        if (role === 'ra') {
+          formatSelect.innerHTML = `
+            <option value="sex">Sexagesimal (H:M:S)</option>
+            <option value="deg">Decimal degrees</option>
+            <option value="hour">Decimal hours</option>`;
+          formatWrap.style.display = 'block';
+          formatSelect.value = guessCoordFormat(sampleRow[Number(col)] || '');
+        } else if (role === 'dec') {
+          formatSelect.innerHTML = `
+            <option value="sex">Sexagesimal (D:M:S)</option>
+            <option value="deg">Decimal degrees</option>`;
+          formatWrap.style.display = 'block';
+          formatSelect.value = guessCoordFormat(sampleRow[Number(col)] || '');
+        } else {
+          formatWrap.style.display = 'none';
+        }
+      }
+      refreshFormatOptions();
+      sel.addEventListener('change', refreshFormatOptions);
+    });
+
+    document.getElementById('convert-btn').addEventListener('click', doConvert);
+    previewArea.innerHTML = '';
+    warningsEl.innerHTML = '';
+    outputArea.style.display = 'none';
+  }
+
+  function doConvert() {
+    const colCount = state.colCount;
+    const roleOf = {};
+    const formatOf = {};
+    for (let i = 0; i < colCount; i++) {
+      const sel = mappingArea.querySelector(`.role-select[data-col="${i}"]`);
+      roleOf[i] = sel.value;
+      const fmtSel = mappingArea.querySelector(`.format-select[data-col-format="${i}"]`);
+      if (fmtSel) formatOf[i] = fmtSel.value;
+    }
+    const appendIgnored = document.getElementById('append-ignored').checked;
+
+    const nameCol = Object.keys(roleOf).find((k) => roleOf[k] === 'name');
+    const raCol = Object.keys(roleOf).find((k) => roleOf[k] === 'ra');
+    const decCol = Object.keys(roleOf).find((k) => roleOf[k] === 'dec');
+    const typeCol = Object.keys(roleOf).find((k) => roleOf[k] === 'type');
+    const noteCol = Object.keys(roleOf).find((k) => roleOf[k] === 'note');
+    const ignoredCols = Object.keys(roleOf).filter((k) => roleOf[k] === 'ignore');
+
+    if (nameCol === undefined) {
+      warningsEl.innerHTML = '<p class="error-text">Map at least one column to "Name".</p>';
+      return;
+    }
+
+    const outRows = [];
+    const warnings = [];
+
+    state.rows.forEach((row, idx) => {
+      const rowNum = idx + 1;
+      const name = (row[nameCol] || '').trim();
+      if (!name) return;
+      if (name.length > 120) warnings.push(`Row ${rowNum}: name is over 120 characters and will be rejected by japyscope-remote.`);
+
+      let raOut = '';
+      if (raCol !== undefined) {
+        const h = parseRa(row[raCol], formatOf[raCol]);
+        if (h === null) warnings.push(`Row ${rowNum} (${name}): could not parse RA "${row[raCol] || ''}".`);
+        else raOut = formatRaHMS(h);
+      }
+
+      let decOut = '';
+      if (decCol !== undefined) {
+        const d = parseDec(row[decCol], formatOf[decCol]);
+        if (d === null) warnings.push(`Row ${rowNum} (${name}): could not parse Dec "${row[decCol] || ''}".`);
+        else decOut = formatDecDMS(d);
+      }
+
+      const type = typeCol !== undefined ? (row[typeCol] || '').trim() : '';
+      let note = noteCol !== undefined ? (row[noteCol] || '').trim() : '';
+      if (appendIgnored && ignoredCols.length) {
+        const extra = ignoredCols.map((c) => row[c]).filter((v) => v && v.trim()).join(' ');
+        if (extra) note = note ? `${note} ${extra}` : extra;
+      }
+      if (note.length > 1000) { note = note.slice(0, 1000); warnings.push(`Row ${rowNum} (${name}): note truncated to 1000 characters.`); }
+
+      outRows.push([name, raOut, decOut, type, note]);
+    });
+
+    warningsEl.innerHTML = warnings.length
+      ? `<div class="error-text"><strong>${warnings.length} warning(s):</strong><ul>${warnings.map((w) => `<li>${w}</li>`).join('')}</ul></div>`
+      : '';
+
+    const previewRows = outRows.slice(0, 10);
+    previewArea.innerHTML = `
+      <h3>Preview (${outRows.length} object${outRows.length === 1 ? '' : 's'})</h3>
+      <table>
+        <thead><tr><th>Name</th><th>RA</th><th>Dec</th><th>Type</th><th>Note</th></tr></thead>
+        <tbody>
+          ${previewRows.map((r) => `<tr>${r.map((v) => `<td>${v}</td>`).join('')}</tr>`).join('')}
+        </tbody>
+      </table>
+      ${outRows.length > 10 ? `<p class="hint">…and ${outRows.length - 10} more row(s) in the CSV output below.</p>` : ''}
+    `;
+
+    const csvLines = ['name,ra,dec,type,note'];
+    outRows.forEach((r) => csvLines.push(r.map(csvField).join(',')));
+    const csvText = csvLines.join('\n');
+    outputCsv.value = csvText;
+    outputArea.style.display = outRows.length ? 'block' : 'none';
+  }
+
+  parseBtn.addEventListener('click', doParse);
+
+  downloadBtn.addEventListener('click', () => {
+    const blob = new Blob([outputCsv.value], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'japyscope-catalog-import.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  });
+
+  copyBtn.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(outputCsv.value);
+      copyBtn.textContent = 'Copied!';
+      setTimeout(() => (copyBtn.textContent = 'Copy to clipboard'), 1500);
+    } catch (e) {
+      // clipboard API unavailable; user can select the textarea manually
+    }
+  });
+</script>

@@ -1,0 +1,86 @@
+---
+import Layout from '../../layouts/Layout.astro';
+const base = import.meta.env.BASE_URL;
+---
+<Layout title="Telescope FOV & Magnification">
+  <p class="breadcrumb"><a href={base}>Tools</a> / Telescope FOV & Magnification</p>
+  <div class="page-header">
+    <h1>Telescope FOV & Magnification</h1>
+    <p>Figure out what an eyepiece will actually do on your telescope before you buy it.</p>
+  </div>
+
+  <div class="panel">
+    <h3 style="margin-top:0;">Telescope</h3>
+    <div class="field-row">
+      <div class="field">
+        <label for="ap">Aperture (mm)</label>
+        <input type="number" id="ap" value="200" step="1" min="1" />
+      </div>
+      <div class="field">
+        <label for="fl">Focal length (mm)</label>
+        <input type="number" id="fl" value="1000" step="1" min="1" />
+      </div>
+    </div>
+
+    <h3>Eyepiece</h3>
+    <div class="field-row">
+      <div class="field">
+        <label for="efl">Focal length (mm)</label>
+        <input type="number" id="efl" value="10" step="0.1" min="0.1" />
+      </div>
+      <div class="field">
+        <label for="afov">Apparent field of view (°)</label>
+        <input type="number" id="afov" value="50" step="1" min="1" max="120" />
+      </div>
+    </div>
+
+    <div class="result">
+      <div class="result-row"><span class="k">Telescope f/ratio</span><span class="v" id="out-fratio">f/5.0</span></div>
+      <div class="result-row"><span class="k">Magnification</span><span class="v" id="out-mag">100×</span></div>
+      <div class="result-row"><span class="k">True field of view</span><span class="v" id="out-tfov">0.50°</span></div>
+      <div class="result-row"><span class="k">True field of view (arcmin)</span><span class="v" id="out-tfov-arcmin">30.0′</span></div>
+      <div class="result-row"><span class="k">Exit pupil</span><span class="v" id="out-pupil">2.00 mm</span></div>
+    </div>
+  </div>
+
+  <p class="note">
+    True FOV = apparent FOV ÷ magnification. Exit pupil = aperture ÷ magnification — under
+    about 0.5–1 mm the image dims noticeably; over 7 mm exceeds most dark-adapted pupils.
+  </p>
+</Layout>
+
+<script>
+  const ap = document.getElementById('ap');
+  const fl = document.getElementById('fl');
+  const efl = document.getElementById('efl');
+  const afov = document.getElementById('afov');
+
+  const outFratio = document.getElementById('out-fratio');
+  const outMag = document.getElementById('out-mag');
+  const outTfov = document.getElementById('out-tfov');
+  const outTfovArcmin = document.getElementById('out-tfov-arcmin');
+  const outPupil = document.getElementById('out-pupil');
+
+  function update() {
+    const aperture = Number(ap.value);
+    const focalLength = Number(fl.value);
+    const eyepieceFl = Number(efl.value);
+    const apparentFov = Number(afov.value);
+
+    if (!aperture || !focalLength || !eyepieceFl) return;
+
+    const fratio = focalLength / aperture;
+    const mag = focalLength / eyepieceFl;
+    const tfov = apparentFov / mag;
+    const pupil = aperture / mag;
+
+    outFratio.textContent = `f/${fratio.toFixed(1)}`;
+    outMag.textContent = `${mag.toFixed(1)}×`;
+    outTfov.textContent = `${tfov.toFixed(2)}°`;
+    outTfovArcmin.textContent = `${(tfov * 60).toFixed(1)}′`;
+    outPupil.textContent = `${pupil.toFixed(2)} mm`;
+  }
+
+  [ap, fl, efl, afov].forEach((el) => el.addEventListener('input', update));
+  update();
+</script>

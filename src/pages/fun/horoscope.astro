@@ -1,0 +1,84 @@
+---
+import Layout from '../../layouts/Layout.astro';
+const base = import.meta.env.BASE_URL;
+---
+<Layout title="Telescope Horoscope">
+  <p class="breadcrumb"><a href={base}>Tools</a> / Telescope Horoscope</p>
+  <div class="page-header">
+    <span class="eyebrow">100% useless, astrologically confused</span>
+    <h1>Telescope Horoscope</h1>
+    <p>Today's completely unscientific forecast, stable all day for a given telescope name.</p>
+  </div>
+
+  <div class="panel">
+    <div class="field">
+      <label for="scope-name">Telescope's name</label>
+      <input type="text" id="scope-name" placeholder="e.g. Big Blue" value="Big Blue" />
+    </div>
+    <button type="button" id="gen-btn">Read the stars</button>
+    <div class="output-box" id="horoscope-output"></div>
+  </div>
+</Layout>
+
+<script>
+  const collimation = [
+    'is perfectly aligned. Enjoy it — it will not last.',
+    'is subtly, infuriatingly, off by one turn of the screw.',
+    'has opinions about being adjusted today. Best not to.',
+    'will hold collimation for exactly as long as you don\'t need it to.',
+  ];
+  const focus = [
+    'Focus will drift the instant the target gets interesting.',
+    'The focuser will feel suspiciously smooth today. Don\'t trust it.',
+    'Temperature focus-shift is in your future, whether you like it or not.',
+    'You will nail focus on the first try and immediately bump the tube.',
+  ];
+  const luck = [
+    'A satellite will cross your best sub. It always does.',
+    'The one cloud in the sky will find your target specifically.',
+    'Tonight\'s seeing will be excellent — for your neighbour, two streets over.',
+    'Everything will work. This will make you deeply suspicious.',
+    'The battery will die at 87% through the sequence, on principle.',
+    'You will finally remember to remove the lens cap before slewing.',
+  ];
+  const advice = [
+    'Bring a jacket you don\'t think you\'ll need.',
+    'Double-check the dew heater is actually plugged in.',
+    'Do not, under any circumstances, "just quickly" update the firmware tonight.',
+    'Whatever you forgot, it\'s the USB hub.',
+    'Trust the polar alignment. Do not trust it enough to skip checking it.',
+  ];
+
+  function hashString(str) {
+    let h = 0;
+    for (let i = 0; i < str.length; i++) {
+      h = (h * 31 + str.charCodeAt(i)) >>> 0;
+    }
+    return h;
+  }
+
+  function pickDeterministic(arr, seed, salt) {
+    const idx = hashString(seed + '|' + salt) % arr.length;
+    return arr[idx];
+  }
+
+  const nameInput = document.getElementById('scope-name');
+  const btn = document.getElementById('gen-btn');
+  const out = document.getElementById('horoscope-output');
+
+  function render() {
+    const name = nameInput.value.trim() || 'Your telescope';
+    const today = new Date().toISOString().slice(0, 10);
+    const seed = `${name}:${today}`;
+    out.innerHTML = `
+      <p><strong>${name}</strong> — ${today}</p>
+      <p><strong>Collimation:</strong> ${pickDeterministic(collimation, seed, 'collimation')}</p>
+      <p><strong>Focus:</strong> ${pickDeterministic(focus, seed, 'focus')}</p>
+      <p><strong>Fortune:</strong> ${pickDeterministic(luck, seed, 'luck')}</p>
+      <p><strong>Advice:</strong> ${pickDeterministic(advice, seed, 'advice')}</p>
+    `;
+  }
+
+  btn.addEventListener('click', render);
+  render();
+</script>

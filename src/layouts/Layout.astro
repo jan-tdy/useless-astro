@@ -1,0 +1,46 @@
+---
+import '../styles/global.css';
+
+const { title, description = 'A small collection of astronomy converters and pointless space toys.' } = Astro.props;
+const pageTitle = title ? `${title} — Useless Astro` : 'Useless Astro';
+const base = import.meta.env.BASE_URL;
+---
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" href={`${base}/favicon.svg`} type="image/svg+xml" />
+    <title>{pageTitle}</title>
+    <meta name="description" content={description} />
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="container">
+        <a class="brand" href={base}>
+          Useless Astro <span class="brand-tag">no login</span>
+        </a>
+        <nav class="site-nav">
+          <a href={base}>Tools</a>
+          <a href={`${base}/#fun`}>Fun</a>
+          <a href="https://github.com/jan-tdy/visual-astro">Visual Astro</a>
+          <a href="https://github.com/jan-tdy/useless-astro">Source</a>
+        </nav>
+      </div>
+    </header>
+    <main>
+      <div class="container">
+        <slot />
+      </div>
+    </main>
+    <footer class="site-footer">
+      <div class="container">
+        <span>Useless Astro — static, client-side, no accounts, no tracking.</span>
+        <span>
+          Need real observation logging? Try
+          <a href="https://github.com/jan-tdy/visual-astro">Visual Astro</a>.
+        </span>
+      </div>
+    </footer>
+  </body>
+</html>
