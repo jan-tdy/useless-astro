@@ -25,11 +25,11 @@ const base = import.meta.env.BASE_URL;
     <div class="field-row">
       <div class="field">
         <label for="lat">Latitude</label>
-        <input type="number" id="lat" step="any" placeholder="37.88" />
+        <input type="number" id="lat" step="any" min="-90" max="90" placeholder="37.88" />
       </div>
       <div class="field">
         <label for="lon">Longitude</label>
-        <input type="number" id="lon" step="any" placeholder="-4.78" />
+        <input type="number" id="lon" step="any" min="-180" max="180" placeholder="-4.78" />
       </div>
       <div class="field" style="flex:0;align-self:end;">
         <button id="fetch-btn" type="button">Get forecast</button>
@@ -72,6 +72,11 @@ const base = import.meta.env.BASE_URL;
       const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}&count=5&language=en`;
       const res = await fetch(url);
       const data = await res.json();
+      if (!res.ok || data.error) {
+        matchesEl.innerHTML = '';
+        showError(data.reason || 'The geocoding service rejected this request.');
+        return;
+      }
       const results = data.results || [];
       if (results.length === 0) {
         matchesEl.innerHTML = '';
@@ -105,10 +110,24 @@ const base = import.meta.env.BASE_URL;
   }
 
   async function loadForecast() {
-    const latV = Number(lat.value);
-    const lonV = Number(lon.value);
-    if (Number.isNaN(latV) || Number.isNaN(lonV)) {
+    const latStr = lat.value.trim();
+    const lonStr = lon.value.trim();
+    if (!latStr || !lonStr) {
       showError('Enter a location or valid coordinates first.');
+      return;
+    }
+    const latV = Number(latStr);
+    const lonV = Number(lonStr);
+    if (Number.isNaN(latV) || Number.isNaN(lonV)) {
+      showError('Coordinates must be numbers.');
+      return;
+    }
+    if (latV < -90 || latV > 90) {
+      showError('Latitude must be between -90 and 90.');
+      return;
+    }
+    if (lonV < -180 || lonV > 180) {
+      showError('Longitude must be between -180 and 180.');
       return;
     }
     showError('');
@@ -117,6 +136,11 @@ const base = import.meta.env.BASE_URL;
       const url = `https://api.open-meteo.com/v1/forecast?latitude=${latV}&longitude=${lonV}&hourly=cloudcover&forecast_days=2&timezone=auto`;
       const res = await fetch(url);
       const data = await res.json();
+      if (!res.ok || data.error) {
+        forecastEl.innerHTML = '';
+        showError(data.reason || 'The forecast service rejected this request.');
+        return;
+      }
       const times = data.hourly.time;
       const clouds = data.hourly.cloudcover;
       const now = new Date();

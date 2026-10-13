@@ -366,7 +366,10 @@ T CrB,15:59:30,+25:55:13`;
       if (decCol !== undefined) {
         const d = parseDec(row[decCol], formatOf[decCol]);
         if (d === null) warnings.push(`Row ${rowNum} (${name}): could not parse Dec "${row[decCol] || ''}".`);
-        else decOut = formatDecDMS(d);
+        else {
+          if (d < -90 || d > 90) warnings.push(`Row ${rowNum} (${name}): Dec ${d.toFixed(4)}° is out of range (-90 to 90) and was clamped to ${d < 0 ? '-90' : '+90'}.`);
+          decOut = formatDecDMS(d);
+        }
       }
 
       const type = typeCol !== undefined ? (row[typeCol] || '').trim() : '';
