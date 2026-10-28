@@ -100,6 +100,11 @@ T CrB,15:59:30,+25:55:13`;
     hasHeaderChk.checked = true;
   });
 
+  function escapeHtml(value) {
+    const entities = { "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" };
+    return String(value).replace(/[&<>"']/g, (char) => entities[char]);
+  }
+
   function parseCsvLine(line) {
     const out = [];
     let cur = '';
@@ -246,7 +251,7 @@ T CrB,15:59:30,+25:55:13`;
     }
     const delim = delimiterSel.value === 'auto' ? detectDelimiter(lines) : delimiterSel.value;
     const rows = lines.map((l) => splitLine(l, delim));
-    const colCount = Math.max(...rows.map((r) => r.length));
+    const colCount = rows.reduce((max, row) => Math.max(max, row.length), 0);
     const hasHeader = hasHeaderChk.checked;
     const header = hasHeader ? rows[0] : [];
     const dataRows = hasHeader ? rows.slice(1) : rows;
@@ -262,8 +267,8 @@ T CrB,15:59:30,+25:55:13`;
       const coordFormat = guessCoordFormat(sample);
       mappingHtml += `
         <div class="field" style="min-width:170px;border:1px solid var(--border);border-radius:var(--radius);padding:0.6rem;">
-          <label>${headerText ? `"${headerText}"` : `Column ${i + 1}`}</label>
-          <p class="hint" style="margin:0 0 0.4rem;">e.g. ${sample || '—'}</p>
+          <label>${headerText ? `"${escapeHtml(headerText)}"` : `Column ${i + 1}`}</label>
+          <p class="hint" style="margin:0 0 0.4rem;">e.g. ${escapeHtml(sample || '—')}</p>
           <select data-col="${i}" class="role-select">
             <option value="ignore" ${role === 'ignore' ? 'selected' : ''}>Ignore</option>
             <option value="name" ${role === 'name' ? 'selected' : ''}>Name</option>
@@ -384,7 +389,7 @@ T CrB,15:59:30,+25:55:13`;
     });
 
     warningsEl.innerHTML = warnings.length
-      ? `<div class="error-text"><strong>${warnings.length} warning(s):</strong><ul>${warnings.map((w) => `<li>${w}</li>`).join('')}</ul></div>`
+      ? `<div class="error-text"><strong>${warnings.length} warning(s):</strong><ul>${warnings.map((w) => `<li>${escapeHtml(w)}</li>`).join('')}</ul></div>`
       : '';
 
     const previewRows = outRows.slice(0, 10);
@@ -393,7 +398,7 @@ T CrB,15:59:30,+25:55:13`;
       <table>
         <thead><tr><th>Name</th><th>RA</th><th>Dec</th><th>Type</th><th>Note</th></tr></thead>
         <tbody>
-          ${previewRows.map((r) => `<tr>${r.map((v) => `<td>${v}</td>`).join('')}</tr>`).join('')}
+          ${previewRows.map((r) => `<tr>${r.map((v) => `<td>${escapeHtml(v)}</td>`).join('')}</tr>`).join('')}
         </tbody>
       </table>
       ${outRows.length > 10 ? `<p class="hint">…and ${outRows.length - 10} more row(s) in the CSV output below.</p>` : ''}
