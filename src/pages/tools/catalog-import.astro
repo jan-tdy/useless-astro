@@ -19,11 +19,24 @@ const base = import.meta.env.BASE_URL;
   <div class="panel">
     <div class="field">
       <label for="raw-input">Paste your data</label>
-      <textarea id="raw-input" rows="8" style="width:100%;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);font-family:var(--font-mono);font-size:0.85rem;padding:0.6rem;"></textarea>
+      <textarea
+        id="raw-input"
+        rows="8"
+        style="width:100%;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);font-family:var(--font-mono);font-size:0.85rem;padding:0.6rem;"
+        placeholder="Paste data here, or drop a CSV/TXT file"
+      ></textarea>
       <p class="hint">
         One object per line. Header row is optional and auto-detected. Works with commas,
-        tabs, semicolons or plain whitespace.
+        tabs, semicolons or plain whitespace. You can also drop a file onto this box, or
+        use the file picker below.
       </p>
+    </div>
+
+    <div class="field-row">
+      <div class="field">
+        <label for="file-input">Or load a file (CSV/TXT)</label>
+        <input type="file" id="file-input" accept=".csv,.txt,text/csv,text/plain" />
+      </div>
     </div>
 
     <div class="field-row">
@@ -66,6 +79,13 @@ const base = import.meta.env.BASE_URL;
     </div>
   </div>
 
+  <style>
+    #raw-input.drag-over {
+      outline: 2px dashed var(--accent, #6cf);
+      outline-offset: 2px;
+    }
+  </style>
+
   <p class="note">
     Everything happens in your browser — nothing is uploaded anywhere. RA/Dec are
     normalized to sexagesimal (<code>HH:MM:SS</code> / <code>±DD:MM:SS</code>) to match
@@ -77,6 +97,7 @@ const base = import.meta.env.BASE_URL;
 
 <script>
   const rawInput = document.getElementById('raw-input');
+  const fileInput = document.getElementById('file-input');
   const delimiterSel = document.getElementById('delimiter');
   const hasHeaderChk = document.getElementById('has-header');
   const parseBtn = document.getElementById('parse-btn');
@@ -99,6 +120,64 @@ T CrB,15:59:30,+25:55:13`;
     delimiterSel.value = 'comma';
     hasHeaderChk.checked = true;
   });
+
+  function loadFile(file) {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      rawInput.value = String(reader.result || '');
+    };
+    reader.onerror = () => {
+      warningsEl.innerHTML = '<p class="error-text">Could not read that file.</p>';
+    };
+    reader.readAsText(file);
+  }
+
+  fileInput.addEventListener('change', () => {
+    loadFile(fileInput.files && fileInput.files[0]);
+  });
+
+  ['dragover', 'dragenter'].forEach((evt) => {
+    rawInput.addEventListener(evt, (e) => {
+      e.preventDefault();
+      rawInput.classList.add('drag-over');
+    });
+  });
+  ['dragleave', 'dragend'].forEach((evt) => {
+    rawInput.addEventListener(evt, () => rawInput.classList.remove('drag-over'));
+  });
+  rawInput.addEventListener('drop', (e) => {
+    e.preventDefault();
+    rawInput.classList.remove('drag-over');
+    const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+    if (file) loadFile(file);
+  });
+
+  const MAPPING_STORAGE_PREFIX = 'useless-astro:catalog-import-mapping:';
+
+  function mappingStorageKey(header, colCount, hasHeader) {
+    const sig = hasHeader && header.length
+      ? header.map((h) => (h || '').trim().toLowerCase()).join('|')
+      : `__nohdr__:${colCount}`;
+    return MAPPING_STORAGE_PREFIX + sig;
+  }
+
+  function loadSavedMapping(key) {
+    try {
+      const raw = localStorage.getItem(key);
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function saveMapping(key, mapping) {
+    try {
+      localStorage.setItem(key, JSON.stringify(mapping));
+    } catch (e) {
+      // localStorage unavailable (private mode, quota, etc.) — skip remembering
+    }
+  }
 
   function escapeHtml(value) {
     const entities = { "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" };
@@ -256,15 +335,17 @@ T CrB,15:59:30,+25:55:13`;
     const header = hasHeader ? rows[0] : [];
     const dataRows = hasHeader ? rows.slice(1) : rows;
 
-    state = { rows: dataRows, hasHeader, header, colCount };
+    const mappingKey = mappingStorageKey(header, colCount, hasHeader);
+    const savedMapping = loadSavedMapping(mappingKey);
+    state = { rows: dataRows, hasHeader, header, colCount, mappingKey };
 
     const sampleRow = dataRows[0] || [];
     let mappingHtml = '<div class="field-row" style="flex-wrap:wrap;">';
     for (let i = 0; i < colCount; i++) {
       const headerText = header[i] || '';
-      const role = guessRole(headerText, i, colCount);
+      const savedCol = savedMapping && savedMapping[i];
+      const role = (savedCol && savedCol.role) || guessRole(headerText, i, colCount);
       const sample = sampleRow[i] || '';
-      const coordFormat = guessCoordFormat(sample);
       mappingHtml += `
         <div class="field" style="min-width:170px;border:1px solid var(--border);border-radius:var(--radius);padding:0.6rem;">
           <label>${headerText ? `"${escapeHtml(headerText)}"` : `Column ${i + 1}`}</label>
@@ -298,27 +379,29 @@ T CrB,15:59:30,+25:55:13`;
       const col = sel.dataset.col;
       const formatWrap = mappingArea.querySelector(`.coord-format[data-col="${col}"]`);
       const formatSelect = formatWrap.querySelector('.format-select');
-      function refreshFormatOptions() {
+      const savedCol = savedMapping && savedMapping[col];
+      function refreshFormatOptions(useSaved) {
         const role = sel.value;
+        const defaultFormat = (useSaved && savedCol && savedCol.format) || guessCoordFormat(sampleRow[Number(col)] || '');
         if (role === 'ra') {
           formatSelect.innerHTML = `
             <option value="sex">Sexagesimal (H:M:S)</option>
             <option value="deg">Decimal degrees</option>
             <option value="hour">Decimal hours</option>`;
           formatWrap.style.display = 'block';
-          formatSelect.value = guessCoordFormat(sampleRow[Number(col)] || '');
+          formatSelect.value = defaultFormat === 'hour' ? 'hour' : defaultFormat;
         } else if (role === 'dec') {
           formatSelect.innerHTML = `
             <option value="sex">Sexagesimal (D:M:S)</option>
             <option value="deg">Decimal degrees</option>`;
           formatWrap.style.display = 'block';
-          formatSelect.value = guessCoordFormat(sampleRow[Number(col)] || '');
+          formatSelect.value = defaultFormat === 'hour' ? 'deg' : defaultFormat;
         } else {
           formatWrap.style.display = 'none';
         }
       }
-      refreshFormatOptions();
-      sel.addEventListener('change', refreshFormatOptions);
+      refreshFormatOptions(true);
+      sel.addEventListener('change', () => refreshFormatOptions(false));
     });
 
     document.getElementById('convert-btn').addEventListener('click', doConvert);
@@ -338,6 +421,14 @@ T CrB,15:59:30,+25:55:13`;
       if (fmtSel) formatOf[i] = fmtSel.value;
     }
     const appendIgnored = document.getElementById('append-ignored').checked;
+
+    if (state.mappingKey) {
+      const mappingToSave = {};
+      for (let i = 0; i < colCount; i++) {
+        mappingToSave[i] = { role: roleOf[i], format: formatOf[i] };
+      }
+      saveMapping(state.mappingKey, mappingToSave);
+    }
 
     const nameCol = Object.keys(roleOf).find((k) => roleOf[k] === 'name');
     const raCol = Object.keys(roleOf).find((k) => roleOf[k] === 'ra');

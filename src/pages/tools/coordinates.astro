@@ -75,6 +75,22 @@ const base = import.meta.env.BASE_URL;
     return Math.min(max, Math.max(min, v));
   }
 
+  // Splits a non-negative value (hours or degrees) into whole/minute/second parts,
+  // rounding to centiseconds first so e.g. 59.996s carries into minutes instead of
+  // rendering as "60.00".
+  function toSexagesimal(absValue) {
+    const totalCentiseconds = Math.round(absValue * 360000);
+    const d = Math.floor(totalCentiseconds / 360000);
+    const remAfterD = totalCentiseconds - d * 360000;
+    const m = Math.floor(remAfterD / 6000);
+    const s = (remAfterD - m * 6000) / 100;
+    return { d, m, s };
+  }
+
+  function isNegativeInput(rawValue, numericValue) {
+    return numericValue < 0 || Object.is(numericValue, -0) || String(rawValue).trim().startsWith('-');
+  }
+
   // --- RA ---
   const raH = document.getElementById('ra-h');
   const raM = document.getElementById('ra-m');
@@ -86,7 +102,7 @@ const base = import.meta.env.BASE_URL;
     const h = Number(raH.value) || 0;
     const m = Number(raM.value) || 0;
     const s = Number(raS.value) || 0;
-    const sign = h < 0 ? -1 : 1;
+    const sign = isNegativeInput(raH.value, h) ? -1 : 1;
     let hours = sign * (Math.abs(h) + m / 60 + s / 3600);
     hours = ((hours % 24) + 24) % 24;
     return hours;
@@ -103,10 +119,8 @@ const base = import.meta.env.BASE_URL;
     if (Number.isNaN(deg)) return;
     deg = ((deg % 360) + 360) % 360;
     const hours = deg / 15;
-    const h = Math.floor(hours);
-    const mFull = (hours - h) * 60;
-    const m = Math.floor(mFull);
-    const s = (mFull - m) * 60;
+    const { d, m, s } = toSexagesimal(hours);
+    const h = d % 24;
     raH.value = h;
     raM.value = m;
     raS.value = s.toFixed(2);
@@ -138,12 +152,9 @@ const base = import.meta.env.BASE_URL;
     let deg = Number(decDeg.value);
     if (Number.isNaN(deg)) return;
     deg = clamp(deg, -90, 90);
-    const sign = deg < 0 ? -1 : 1;
+    const sign = isNegativeInput(decDeg.value, deg) ? -1 : 1;
     const abs = Math.abs(deg);
-    const d = Math.floor(abs);
-    const mFull = (abs - d) * 60;
-    const m = Math.floor(mFull);
-    const s = (mFull - m) * 60;
+    const { d, m, s } = toSexagesimal(abs);
     decSign.value = String(sign);
     decD.value = d;
     decM.value = m;
