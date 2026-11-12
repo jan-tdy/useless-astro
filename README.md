@@ -1,5 +1,11 @@
 # Useless Astro
 
+> **⚠ Deprecated.** All the tools and fun pages below have moved to
+> [Visual Astro's Tools page](https://japysoft.bombol.space/tools), where they're
+> maintained going forward. This repository is kept online for existing links but is no
+> longer under active development — no new features, and only the fixes needed to keep
+> the GitHub Pages deployment working.
+
 A small, static, no-login toolbox of astronomy converters — plus a few things that exist
 purely because they're funny. Built with [Astro](https://astro.build/), deployed to
 GitHub Pages, nothing to sign up for.
