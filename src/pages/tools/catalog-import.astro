@@ -222,7 +222,7 @@ T CrB,15:59:30,+25:55:13`;
   }
 
   function detectDelimiter(lines) {
-    const separator = { tab: '\\t', semicolon: ';', comma: ',' };
+    const separator = { tab: '\t', semicolon: ';', comma: ',' };
     const candidates = ['tab', 'semicolon', 'comma'].filter((delimiter) =>
       lines.some((line) => line.includes(separator[delimiter]))
     );
