@@ -222,10 +222,22 @@ T CrB,15:59:30,+25:55:13`;
   }
 
   function detectDelimiter(lines) {
-    if (lines.some((l) => l.includes('\t'))) return 'tab';
-    if (lines.some((l) => l.includes(','))) return 'comma';
-    if (lines.some((l) => l.includes(';'))) return 'semicolon';
-    return 'ws';
+    const separator = { tab: '\t', semicolon: ';', comma: ',' };
+    const candidates = ['tab', 'semicolon', 'comma'].filter((delimiter) =>
+      lines.some((line) => line.includes(separator[delimiter]))
+    );
+    if (!candidates.length) return 'ws';
+    let best = { delimiter: null, score: 0 };
+    for (const delimiter of candidates) {
+      const widths = lines.map((line) => splitLine(line, delimiter).length);
+      const counts = new Map();
+      widths.forEach((width) => counts.set(width, (counts.get(width) || 0) + 1));
+      const score = Math.max(...counts.values()) / lines.length;
+      // Prefer semicolons on ties, since decimal-comma files commonly contain
+      // commas inside coordinate fields as well as semicolons between columns.
+      if (score > best.score) best = { delimiter, score };
+    }
+    return best.score > 0 && best.delimiter ? best.delimiter : 'ws';
   }
 
   function parseSexagesimal(str) {
@@ -241,24 +253,24 @@ T CrB,15:59:30,+25:55:13`;
     s = s.replace(/[hHmM°'′]/g, ' ').replace(/[sS"″]/g, '');
     const parts = s.trim().split(/[:\s]+/).filter(Boolean);
     if (parts.length === 0) return null;
-    const d = Number(parts[0]);
+    const d = Number(parts[0].replace(',', '.'));
     if (Number.isNaN(d)) return null;
-    const m = parts[1] !== undefined ? Number(parts[1]) : 0;
-    const sec = parts[2] !== undefined ? Number(parts[2]) : 0;
+    const m = parts[1] !== undefined ? Number(parts[1].replace(',', '.')) : 0;
+    const sec = parts[2] !== undefined ? Number(parts[2].replace(',', '.')) : 0;
     if (Number.isNaN(m) || Number.isNaN(sec)) return null;
     return sign * (Math.abs(d) + m / 60 + sec / 3600);
   }
 
   function parseRa(raw, format) {
     if (format === 'sex') return parseSexagesimal(raw);
-    const v = Number(raw);
+    const v = Number(String(raw).trim().replace(',', '.'));
     if (Number.isNaN(v)) return null;
     return format === 'deg' ? v / 15 : v;
   }
 
   function parseDec(raw, format) {
     if (format === 'sex') return parseSexagesimal(raw);
-    const v = Number(raw);
+    const v = Number(String(raw).trim().replace(',', '.'));
     return Number.isNaN(v) ? null : v;
   }
 
