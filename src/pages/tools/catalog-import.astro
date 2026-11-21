@@ -222,7 +222,11 @@ T CrB,15:59:30,+25:55:13`;
   }
 
   function detectDelimiter(lines) {
-    const candidates = ['tab', 'semicolon', 'comma'];
+    const separator = { tab: '\\t', semicolon: ';', comma: ',' };
+    const candidates = ['tab', 'semicolon', 'comma'].filter((delimiter) =>
+      lines.some((line) => line.includes(separator[delimiter]))
+    );
+    if (!candidates.length) return 'ws';
     let best = { delimiter: null, score: 0 };
     for (const delimiter of candidates) {
       const widths = lines.map((line) => splitLine(line, delimiter).length);
