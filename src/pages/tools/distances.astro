@@ -72,8 +72,15 @@ const base = import.meta.env.BASE_URL;
   }
 
   function update() {
-    const value = Number(valueInput.value);
-    if (Number.isNaN(value)) return;
+    const raw = valueInput.value.trim();
+    const value = raw === '' ? undefined : Number(raw);
+    if (value === undefined || !Number.isFinite(value)) {
+      results.innerHTML = Object.entries(units)
+        .filter(([key]) => key !== unitSelect.value)
+        .map(([key, def]) => `<div class="result-row"><span class="k">${def.label}</span><span class="v">—</span></div>`)
+        .join('');
+      return;
+    }
     const unit = unitSelect.value;
     const km = units[unit].toKm(value);
 
