@@ -55,16 +55,30 @@ const base = import.meta.env.BASE_URL;
   const ratioBA = document.getElementById('mag-ratio-ba');
   const brighter = document.getElementById('mag-brighter');
 
+  function readNumber(input) {
+    if (input.value.trim() === '') return undefined;
+    const value = Number(input.value);
+    return Number.isFinite(value) ? value : undefined;
+  }
+
   function updateFromMagnitudes() {
-    const a = Number(magA.value);
-    const b = Number(magB.value);
-    if (Number.isNaN(a) || Number.isNaN(b)) return;
+    const a = readNumber(magA);
+    const b = readNumber(magB);
+    if (a === undefined || b === undefined) {
+      magDiff.textContent = ratioAB.textContent = ratioBA.textContent = brighter.textContent = '—';
+      return;
+    }
     const diff = a - b;
+    if (!Number.isFinite(diff)) {
+      magDiff.textContent = ratioAB.textContent = ratioBA.textContent = brighter.textContent = '—';
+      return;
+    }
     // A brighter object has a *smaller* magnitude, so flux_A/flux_B = 10^(-(a-b)/2.5)
     const fluxAB = Math.pow(10, -diff / 2.5);
     magDiff.textContent = diff.toFixed(4);
-    ratioAB.textContent = fluxAB.toFixed(6);
-    ratioBA.textContent = (1 / fluxAB).toFixed(6);
+    ratioAB.textContent = Number.isFinite(fluxAB) && fluxAB > 0 ? fluxAB.toFixed(6) : '—';
+    const fluxBA = 1 / fluxAB;
+    ratioBA.textContent = Number.isFinite(fluxBA) && fluxBA > 0 ? fluxBA.toFixed(6) : '—';
     brighter.textContent = diff === 0 ? 'equal' : diff < 0 ? 'A' : 'B';
   }
 
@@ -75,8 +89,8 @@ const base = import.meta.env.BASE_URL;
   const ratioOut = document.getElementById('ratio-out');
 
   function updateFromRatio() {
-    const r = Number(ratioIn.value);
-    if (Number.isNaN(r) || r <= 0) {
+    const r = readNumber(ratioIn);
+    if (r === undefined || r <= 0) {
       ratioOut.textContent = '—';
       return;
     }
