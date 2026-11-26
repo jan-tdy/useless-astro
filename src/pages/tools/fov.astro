@@ -67,7 +67,12 @@ const base = import.meta.env.BASE_URL;
     const eyepieceFl = Number(efl.value);
     const apparentFov = Number(afov.value);
 
-    if (!aperture || !focalLength || !eyepieceFl) return;
+    if (![aperture, focalLength, eyepieceFl, apparentFov].every(Number.isFinite) ||
+        [aperture, focalLength, eyepieceFl, apparentFov].some((value) => value <= 0)) {
+      outFratio.textContent = outMag.textContent = outTfov.textContent =
+        outTfovArcmin.textContent = outPupil.textContent = '—';
+      return;
+    }
 
     const fratio = focalLength / aperture;
     const mag = focalLength / eyepieceFl;
