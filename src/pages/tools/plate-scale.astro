@@ -87,7 +87,12 @@ const base = import.meta.env.BASE_URL;
     const widthPx = Number(resX.value);
     const heightPx = Number(resY.value);
 
-    if (!focalLength || !pixelSize || !widthPx || !heightPx) return;
+    if (![focalLength, pixelSize, widthPx, heightPx].every(Number.isFinite) ||
+        [focalLength, pixelSize, widthPx, heightPx].some((value) => value <= 0)) {
+      outScale.textContent = outSensorW.textContent = outSensorH.textContent =
+        outFovW.textContent = outFovH.textContent = outSampling.textContent = '—';
+      return;
+    }
 
     const arcsecPerPixel = (206.265 * pixelSize) / focalLength;
     const sensorWidthMm = (pixelSize * widthPx) / 1000;
